@@ -1,7 +1,7 @@
 import User from "../models/User.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import {SALT, SECRET_JWT} from "../config.js";
+import {SALT, SECRET_JWT, transporter} from "../config.js";
 
 export const register = async (req, res) => {
     try {
@@ -66,7 +66,7 @@ export const login = async (req, res) => {
 
         if (!user) {
             return res.status(404).json({
-                message: 'Пользователб с таким логином не существует!',
+                message: 'Пользователь с таким логином не существует!',
                 input: 'userName'
             })
         }
@@ -112,6 +112,79 @@ export const me = async (req, res) => {
     }
 }
 
+export const reset = async (req, res) => {
+    try {
+
+        const data = req.body;
+
+        if (data.email) {
+            const user = await User.findOne({email: data.email})
+
+            if (!user) {
+                return res.status(404).json({
+                    message: 'Пользователб с таким логином не существует!',
+                    input: 'userName'
+                })
+            }
+
+            const genNewCode = Math.floor(100000 + Math.random() * 900000);
+
+            const mailOptions = {
+                from: 'fololinka-app@gmail.com',
+                to: data.email,
+                subject: 'Код для сброса пароля в приложении  Фотолинк',
+                text: `Ваш пароль для сброса пароля: ${genNewCode}, НИКОМУ НЕ ПЕРЕДАВАЙТЕ!`,
+            };
+
+            transporter.sendMail(mailOptions, (error, info) => {
+                if (error) {
+                    console.error('Ошибка при отправке почты:', error);
+                } else {
+                    console.log('Письмо отправлено: ', info.response);
+                }
+            });
+
+            await User.findOneAndUpdate({email: data.email}, {resetCode: genNewCode})
+
+
+            return res.status(200).json({userId: user._id})
+        } else if (data.resetCode) {
+            const user = await User.findOne({resetCode: data.resetCode})
+
+            if (!user) {
+                return res.status(401).json({
+                    message: 'Неверный код!',
+                    input: 'resetCode'
+                })
+            }
+
+            await User.findOneAndUpdate({resetCode: data.resetCode}, {resetCode: ""})
+
+            return res.status(200).json({userId: user._id})
+        } else if (data.newPassword) {
+            const user = await User.findById(data.userId)
+
+            const passwordMatches = await bcrypt.compare(data.newPassword, user.password)
+
+            if (passwordMatches) {
+                return res.status(401).json({
+                    message: 'Это старый пароль! Введите новый пароль!',
+                    input: 'newPassword'
+                })
+            }
+
+            const hashedPassword = await bcrypt.hash(data.newPassword, SALT)
+
+            await User.findByIdAndUpdate(data.userId, {password: hashedPassword})
+
+            return res.status(200).json({userId: user._id, message: 'Пароль успешно сброшен!'})
+        }
+
+    } catch (e) {
+        console.log(e)
+        return res.status(500).json('Серверная ошибка!')
+    }
+}
 
 function genToken (userId) {
     const token = jwt.sign({userId}, SECRET_JWT)

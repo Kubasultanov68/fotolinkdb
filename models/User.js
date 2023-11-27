@@ -23,7 +23,7 @@ const UserSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
-    resetCode: Number,
+    resetCode: String,
     avatarUrl: String
 })
 

@@ -23,3 +23,4 @@ router.listen(PORT,(e) => {
 router.post('/auth/register', UserController.register)
 router.post('/auth/login', UserController.login)
 router.post('/auth/me', UserController.me)
+router.post('/auth/reset', UserController.reset)
